@@ -9,7 +9,6 @@ GET /api/event-media : Lists the content of the drive folder of event media
 GET /api/event-media/id : Gets the specific media from the event media folder
 
 GET /api/employees : Gets the data from the employees sheet
-GET /api/employees-images : Lists the images of the employees from the employees images drive folder
 GET /api/employee-images/id : Gets the specific image from the folder
 
 GET /api/event-details : Gets the details from the event sheet

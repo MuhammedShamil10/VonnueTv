@@ -11,6 +11,7 @@ require('dotenv').config();
 
 const app = express()
 const PORT = process.env.PORT || 3001;
+const baseUrl = process.env.BACKEND_URL || `http://localhost:${PORT}`;
 ffmpeg.setFfmpegPath(ffmpegPath)
 ffmpeg.setFfprobePath(ffprobePath);
 
@@ -86,7 +87,7 @@ app.get('/api/employees', async (req, res) => {
         const imageMap = {};
         files.forEach(f => {
             if (f.type === 'image') {
-                imageMap[f.id] = `http://localhost:${PORT}/api/employee-images/${f.id}`;
+                imageMap[f.id] = `${baseUrl}/api/employee-images/${f.id}`;
             }
         });
 
@@ -161,7 +162,7 @@ app.get('/api/event-media', async (req, res) => {
 
         return {
           ...file,
-          url: `http://localhost:${PORT}/api/event-media/${file.id}`,
+          url: `${baseUrl}/api/event-media/${file.id}`,
           durationSeconds,
         };
       })

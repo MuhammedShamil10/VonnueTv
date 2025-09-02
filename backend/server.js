@@ -77,15 +77,34 @@ app.get('/api/employees', async (req, res) => {
     try {
         const cached = getCache('employees');
         if (cached) {
-            return res.json(cached)
+            return res.json(cached);
         }
 
         const rows = await readSheet(process.env.EMPLOYEE_SHEET_ID, process.env.SHEET_RANGE_EMPLOYEE);
-        setCache('employees', rows);
-        res.json(rows);
-    } catch (err){ 
+        const files = await listDriveMedia(process.env.EMPLOYEE_IMAGE_FOLDER_ID);
+
+        const imageMap = {};
+        files.forEach(f => {
+            if (f.type === 'image') {
+                imageMap[f.id] = `http://localhost:${PORT}/api/employee-images/${f.id}`;
+            }
+        });
+
+        const merged = rows.map((row, index) => {
+            if (index === 0) return row; // header row
+            const imageId = row[2].split('/').pop(); // extract fileId from sheet URL
+            return [
+                row[0], // Employee name
+                row[1], // Employee detail
+                imageMap[imageId] || row[2] // always use backend streaming URL
+            ];
+        });
+
+        setCache('employees', merged);
+        res.json(merged);
+    } catch (err) {
         console.error('employee error', err);
-        res.status(500).json({ error: err.message })
+        res.status(500).json({ error: err.message });
     }
 });
 
@@ -183,30 +202,6 @@ app.get('/api/event-media/:fileId', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
-  }
-});
-
-//GET employee-image
-app.get('/api/employee-images', async (req, res) => {
-  try {
-    const cached = getCache('employee-images');
-    if (cached) {
-      return res.json(cached)
-    }
-
-    const files = await listDriveMedia(process.env.EMPLOYEE_IMAGE_FOLDER_ID);
-
-    const images = files.filter(f => f.type === 'image').map(f => ({
-      id: f.id,
-      name: f.name,
-      url: `http://localhost:${PORT}/api/employee-images/${f.id}`
-    }));
-
-    setCache('employee-images', images);
-    res.json(images)
-  } catch (err) {
-    console.error('employee-images error', err);
-    res.status(500).json({ error: err.message })
   }
 });
 

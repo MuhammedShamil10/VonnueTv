@@ -3,33 +3,34 @@ import React, { useEffect, useState } from "react";
 export default function Carousel() {
   const [screenIndex, setScreenIndex] = useState(0);
   const [data, setData] = useState({});
+  const baseUrl = process.env.BACKEND_URL || `http://localhost:3001`
 
   const SECTIONS = [
     {
       key: "businessNews",
       title: "📊 Business Updates",
-      url: "http://192.168.0.243:3001/api/business-news",
+      url: `${baseUrl}/api/business-news`,
       theme: "from-blue-600 to-indigo-800",
       type: "news",
     },
     {
       key: "corpNews",
       title: "🏢 Office / Corporate",
-      url: "http://192.168.0.243:3001/api/corp-news",
+      url: `${baseUrl}/api/corp-news`,
       theme: "from-emerald-600 to-teal-800",
       type: "news",
     },
     {
       key: "media",
       title: "🎥 Media & Events",
-      url: "http://192.168.0.243:3001/api/event-media",
+      url: `${baseUrl}/api/event-media`,
       theme: "from-purple-600 to-pink-700",
       type: "news",
     },
     {
       key: "employees",
       title: "👥 Employee Highlights",
-      url: "http://192.168.0.243:3001/api/employees",
+      url: `${baseUrl}/api/employees`,
       theme: "from-orange-600 to-red-700",
       type: "employee",
     },

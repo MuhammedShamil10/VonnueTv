@@ -17,7 +17,7 @@ export default function Carousel() {
     },
     {
       key: "corpNews",
-      title: "🏢 Office / Corporate",
+      title: "🏢 Office / Corporate", 
       url: `${baseUrl}/api/corp-news`,
       theme: "from-[#216869] to-[#6e68a1]",
       type: "news",
@@ -207,9 +207,9 @@ function Card({ type, item }) {
       {item.Description && (
         <p className="text-sm opacity-90 line-clamp-2">{item.Description}</p>
       )}
-      {item.URL && (
+      {item.url && (
         <img
-          src={item.URL}
+          src={item.url}
           alt={item.Title}
           className="w-full h-32 object-cover rounded-lg mt-3"
           loading="lazy"

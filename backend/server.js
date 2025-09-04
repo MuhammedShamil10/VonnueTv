@@ -11,7 +11,7 @@ require('dotenv').config();
 
 const app = express()
 const PORT = process.env.PORT || 3001;
-const baseUrl = process.env.BACKEND_URL || `http://localhost:${PORT}`;
+const baseUrl = process.env.BACKEND_URL //|| `http://localhost:${PORT}`;
 ffmpeg.setFfmpegPath(ffmpegPath)
 ffmpeg.setFfprobePath(ffprobePath);
 
@@ -75,39 +75,49 @@ app.get('/api/corp-news', async (req, res) => {
 
 //GET details from employees sheet
 app.get('/api/employees', async (req, res) => {
-    try {
-        const cached = getCache('employees');
-        if (cached) {
-            return res.json(cached);
-        }
-
-        const rows = await readSheet(process.env.EMPLOYEE_SHEET_ID, process.env.SHEET_RANGE_EMPLOYEE);
-        const files = await listDriveMedia(process.env.EMPLOYEE_IMAGE_FOLDER_ID);
-
-        const imageMap = {};
-        files.forEach(f => {
-            if (f.type === 'image') {
-                imageMap[f.id] = `${baseUrl}/api/employee-images/${f.id}`;
-            }
-        });
-
-        const merged = rows.map((row, index) => {
-            if (index === 0) return row; // header row
-            const imageId = row[2].split('/').pop(); // extract fileId from sheet URL
-            return [
-                row[0], // Employee name
-                row[1], // Employee detail
-                imageMap[imageId] || row[2] // always use backend streaming URL
-            ];
-        });
-
-        setCache('employees', merged);
-        res.json(merged);
-    } catch (err) {
-        console.error('employee error', err);
-        res.status(500).json({ error: err.message });
+  try {
+    const cached = getCache('employees');
+    if (cached) {
+      return res.json(cached);
     }
+
+    const rows = await readSheet(process.env.EMPLOYEE_SHEET_ID, process.env.SHEET_RANGE_EMPLOYEE);
+    const files = await listDriveMedia(process.env.EMPLOYEE_IMAGE_FOLDER_ID);
+
+    const imageMap = {};
+    files.forEach(f => {
+      if (f.type === 'image') {
+        imageMap[f.id] = `${baseUrl}/api/employee-images/${f.id}`;
+      }
+    });
+
+    const merged = rows.map((row, index) => {
+      if (index === 0) return row; // header row
+
+      let imageId = null;
+      const url = row[2];
+
+      // Try to extract fileId if it's a Google Drive link
+      const match = url.match(/\/d\/([a-zA-Z0-9_-]+)\//);
+      if (match && match[1]) {
+        imageId = match[1];
+      }
+
+      return [
+        row[0], // Employee name
+        row[1], // Employee detail
+        imageId ? (imageMap[imageId] || `${baseUrl}/api/employee-images/${imageId}`) : url
+      ];
+    });
+
+    setCache('employees', merged);
+    res.json(merged);
+  } catch (err) {
+    console.error('employee error', err);
+    res.status(500).json({ error: err.message });
+  }
 });
+
 
 //GET details from event sheet
 app.get('/api/event-details', async (req, res) => {

@@ -209,6 +209,9 @@ app.get('/api/event-media/:fileId', async (req, res) => {
 
     res.setHeader('Content-Type', meta.data.mimeType);
     res.setHeader('Content-Disposition', `inline; filename="${meta.data.name}"`);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('ETag', fileId + '-' + new Date(meta.data.modifiedTime).getTime());
+
     response.data.pipe(res);
   } catch (err) {
     console.error(err);

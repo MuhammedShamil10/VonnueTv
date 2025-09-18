@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
 require('dotenv').config();
-const path = require('path')
+const path = require('path');
 
 const auth = new google.auth.GoogleAuth({
     keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,

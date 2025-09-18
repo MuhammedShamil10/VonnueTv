@@ -228,14 +228,18 @@ app.get('/api/employee-images/:fileId', async (req, res) => {
       fields:'name, mimeType'
     });
 
+    res.setHeader('Content-Type', meta.data.mimeType);
+    res.setHeader('Content-Disposition', `inline; filename="${meta.data.name}"`);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    res.setHeader('ETag', fileId + '-' + new Date(meta.data.modifiedTime).getTime());
+
     const response = await driveWithAuth.files.get(
       { fileId, alt: 'media' },
       { responseType: 'stream' }
     );
 
-    res.setHeader('Content-Type', meta.data.mimeType);
-    res.setHeader('Content-Disposition', `inline; filename="${meta.data.name}"`);
     response.data.pipe(res)
+
   } catch (err) {
     console.error('employee image stream error', err);
     res.status(500).json({ error: err.message })

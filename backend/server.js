@@ -6,6 +6,10 @@ const ffprobePath = require('ffprobe-static').path;
 const { readSheet, listDriveMedia, auth, drive } = require('./google');
 const { google } = require('googleapis')
 const { error } = require('console');
+const fs  = require('fs');
+const tmp = require('tmp');
+const { resolve } = require('dns');
+const { rejects } = require('assert');
 require('dotenv').config(); 
 
 
@@ -21,6 +25,7 @@ app.use(express.json());
 
 //cache
 const cache = {}
+const videoCache = {}
 const CACHE_TTL = parseInt(process.env.CACHE_TTL_SECONDS || '60', 10)
 
 function setCache(key, value){
@@ -37,6 +42,40 @@ function getCache(key){
         return null;
     }
     return item.value
+}
+
+
+//Downloading video temporarily
+async function downloadVideo(videoId) {
+  const client = await auth.getClient();
+  const driveWithAuth = google.drive({ version: 'v3', auth: client });
+
+  return new Promise((resolve, reject) => {
+    const tempFile = tmp.fileSync({ postfix: '.mp4' });
+    const writeStream = fs.createWriteStream(tempFile.name);
+
+    driveWithAuth.files.get(
+      { fileId: videoId, alt: 'media' },
+      { responseType: 'stream' },
+      (err, response) => {
+        if (err) return reject(err);
+        response.data
+          .pipe(writeStream)
+          .on('finish', () => resolve(tempFile))
+          .on('error', reject);
+      }
+    );
+  });
+}
+
+//Get duration
+async function getVideoDuration(filePath) {
+  return new Promise((resolve, reject) => {
+    ffmpeg(filePath).ffprobe((err, metadata) => {
+      if (err) return reject(err);
+      resolve(metadata.format.duration || 10);
+    });
+  });
 }
 
 //GET details from business sheet
@@ -83,6 +122,8 @@ app.get('/api/employees', async (req, res) => {
 
     const rows = await readSheet(process.env.EMPLOYEE_SHEET_ID, process.env.SHEET_RANGE_EMPLOYEE);
     const files = await listDriveMedia(process.env.EMPLOYEE_IMAGE_FOLDER_ID);
+    
+    
 
     const imageMap = {};
     files.forEach(f => {
@@ -144,44 +185,46 @@ app.get('/api/event-media', async (req, res) => {
 
     const files = await listDriveMedia(process.env.DRIVE_FOLDER_ID_EVENTS);
 
-    const enriched = await Promise.all(
-      files.map(async (file) => {
-        let durationSeconds = 10; 
+    const enriched = [];
 
-        if (file.type === 'video') {
-          try {
-            const client = await auth.getClient();
-            const driveWithAuth = google.drive({ version: 'v3', auth: client });
+    for (const file of files) {
+      if (file.type === 'video') {
+    
+        if (!videoCache[file.id]) {
+          const tempFile = await downloadVideo(file.id);
+          const durationSeconds = await getVideoDuration(tempFile.name);
+          tempFile.removeCallback();
 
-            const streamResponse = await driveWithAuth.files.get(
-              { fileId: file.id, alt: 'media' },
-              { responseType: 'stream' }
-            );
-
-            durationSeconds = await new Promise((resolve, reject) => {
-              ffmpeg(streamResponse.data).ffprobe((err, metadata) => {
-                if (err) return reject(err);
-                resolve(metadata.format.duration + 2); 
-              });
-            });
-          } catch (err) {
-            console.error('Error getting video duration for', file.name, err);
-            durationSeconds = 60;
-          }
+          videoCache[file.id] = {
+            durationSeconds,
+            name: file.name,
+            url: `${baseUrl}/api/event-media/${file.id}`
+          };
         }
 
-        return {
-          ...file,
+        enriched.push({
+          id: file.id,
+          name: file.name,
+          type: 'video',
           url: `${baseUrl}/api/event-media/${file.id}`,
-          durationSeconds,
-        };
-      })
-    );
+          durationSeconds: videoCache[file.id].durationSeconds
+        });
+      } else {
+        // For images, use default duration
+        enriched.push({
+          id: file.id,
+          name: file.name,
+          type: 'image',
+          url: `${baseUrl}/api/event-media/${file.id}`,
+          durationSeconds: 10
+        });
+      }
+    }
 
     setCache('event-media', enriched);
     res.json(enriched);
   } catch (err) {
-    console.error('event-media error', err);
+    console.error(err);
     res.status(500).json({ error: err.message });
   }
 });

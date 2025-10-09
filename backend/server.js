@@ -122,12 +122,10 @@ app.get('/api/employees', async (req, res) => {
 
     const rows = await readSheet(process.env.EMPLOYEE_SHEET_ID, process.env.SHEET_RANGE_EMPLOYEE);
     const files = await listDriveMedia(process.env.EMPLOYEE_IMAGE_FOLDER_ID);
-    console.log('test',Array.isArray(files));
-    console.log(files);
     
     
 
-    const imageMap = {};d
+    const imageMap = {};
     files.forEach(f => {
       if (f.type === 'image') {
         imageMap[f.id] = `${baseUrl}/api/employee-images/${f.id}`;
@@ -191,11 +189,11 @@ app.get('/api/event-media', async (req, res) => {
 
     for (const file of files) {
       if (file.type === 'video') {
-        // Check if duration is cached
+    
         if (!videoCache[file.id]) {
           const tempFile = await downloadVideo(file.id);
           const durationSeconds = await getVideoDuration(tempFile.name);
-          tempFile.removeCallback(); // cleanup
+          tempFile.removeCallback();
 
           videoCache[file.id] = {
             durationSeconds,

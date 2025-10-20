@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQueries } from "@tanstack/react-query";
 import placeholder from "../assets/vonnueIcon.png";
 
-const baseUrl = "http://192.168.0.243:3001";
+const baseUrl = "http://127.0.0.1:3001";
 
 export default function Carousel() {
   const [screenIndex, setScreenIndex] = useState(0);
@@ -97,9 +97,7 @@ export default function Carousel() {
       <header className="w-full bg-[#1e293b] text-white flex justify-between items-center px-8 py-3 shadow-lg">
         <div className="flex items-center space-x-2">
           <h1 className="text-2xl font-bold">Vonnue</h1>
-          <span className="bg-blue-600 text-xs font-semibold px-2 py-1 rounded">
-            INNOVATION
-          </span>
+          <h1 className="text-2xl font-bold">Innovations</h1>
         </div>
         <div className="text-right">
           <div className="text-lg font-bold">

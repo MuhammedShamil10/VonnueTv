@@ -4,7 +4,6 @@ import { useQueries } from "@tanstack/react-query";
 import placeholder from "../assets/vonnueIcon.png";
 
 const baseUrl = "http://localhost:3001";
-
 export default function Carousel() {
   const [screenIndex, setScreenIndex] = useState(0);
   const [dateTime, setDateTime] = useState(new Date());

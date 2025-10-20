@@ -3,12 +3,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useQueries } from "@tanstack/react-query";
 import placeholder from "../assets/vonnueIcon.png";
 
-const baseUrl = "http://127.0.0.1:3001";
-
+const baseUrl = "http://localhost:3001";
 export default function Carousel() {
   const [screenIndex, setScreenIndex] = useState(0);
   const [dateTime, setDateTime] = useState(new Date());
-
 
   const SECTIONS = [
     {
@@ -29,6 +27,7 @@ export default function Carousel() {
       key: "media",
       title: "🎥 Media & Events",
       url: `${baseUrl}/api/event-media`,
+      extraUrl: `${baseUrl}/api/event-details`, // 👈 dynamic extra API
       theme: "from-[#677DB7] to-[#415a77]",
       type: "media",
     },
@@ -52,13 +51,38 @@ export default function Carousel() {
     );
   };
 
+  // Fetch all section data dynamically
   const queries = useQueries({
     queries: SECTIONS.map((s) => ({
       queryKey: [s.key],
       queryFn: async () => {
+        // Fetch main section data
         const res = await fetch(s.url);
         const data = await res.json();
-        return s.key === "media" ? data : formatData(data);
+
+        // Format main data
+        let mainData;
+        if (s.key === "media") {
+          mainData = data; // media already in proper format
+        } else {
+          mainData = formatData(data); // Convert 2D array to objects
+        }
+
+        // If section has extra URL (like event details)
+        if (s.extraUrl) {
+          const extraRes = await fetch(s.extraUrl);
+          const extraData = await extraRes.json();
+
+          // Normalize extra data with formatData and add _type
+          const formattedExtra = formatData(extraData).map((d) => ({
+            ...d,
+            _type: "eventDetail",
+          }));
+
+          mainData = [...mainData, ...formattedExtra];
+        }
+
+        return mainData;
       },
       staleTime: 60000,
       refetchInterval: 60000,
@@ -97,7 +121,6 @@ export default function Carousel() {
       <header className="w-full bg-[#1e293b] text-white flex justify-between items-center px-8 py-3 shadow-lg">
         <div className="flex items-center space-x-2">
           <h1 className="text-2xl font-bold">Vonnue</h1>
-          <h1 className="text-2xl font-bold">Innovations</h1>
         </div>
         <div className="text-right">
           <div className="text-lg font-bold">
@@ -137,7 +160,11 @@ export default function Carousel() {
           ) : (
             <div className="flex flex-wrap justify-center gap-6 w-full max-w-7xl overflow-hidden">
               {items.map((item, index) => (
-                <Card key={item.id || index} type={active.type} item={item} />
+                <Card
+                  key={item.id || index}
+                  type={item._type || active.type}
+                  item={item}
+                />
               ))}
             </div>
           )}
@@ -152,7 +179,6 @@ function Card({ type, item }) {
   const baseClasses =
     "bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl text-white flex flex-col flex-1 basis-[22rem] min-w-[18rem] max-w-[24rem]";
   const [isLoaded, setIsLoaded] = useState(false);
-
   if (type === "employee") {
     return (
       <div className={`${baseClasses} p-6`}>
@@ -174,7 +200,7 @@ function Card({ type, item }) {
     const isVideo = item.type === "video" || item.url?.endsWith(".mp4");
     return (
       <div className={baseClasses}>
-        <div className="relative w-full h-56 rounded-t-2xl overflow-hidden bg-black/50">
+        <div className="relative w-full h-56 rounded-2xl overflow-hidden bg-black/50">
           {!isLoaded && (
             <img
               src={placeholder}
@@ -205,9 +231,24 @@ function Card({ type, item }) {
             />
           )}
         </div>
-        <div className="p-4 flex-1">
-          <h2 className="text-lg font-bold">{item.name}</h2>
-        </div>
+      </div>
+    );
+  }
+
+  if (type === "eventDetail") {
+    return (
+      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl text-white flex flex-col p-6 min-w-[20rem] max-w-[24rem]">
+        <h2 className="text-2xl font-bold mb-2">{item["Event name"]}</h2>
+
+        {item["Date"] && (
+          <p className="text-sm text-gray-200 mb-1">
+            📅 {new Date(item["Date"]).toLocaleDateString()}
+          </p>
+        )}
+
+        {item["Event description"] && (
+          <p className="text-sm opacity-90 mt-2">{item["Event description"]}</p>
+        )}
       </div>
     );
   }

@@ -1,87 +1,45 @@
+// src/components/Carousel.jsx
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueries } from "@tanstack/react-query";
-import placeholder from "../assets/vonnueIcon.png";
 
-const baseUrl = "http://localhost:3001";
+import SECTIONS from "../constants/SECTIONS";
+import { fetchJson } from "../services/api";
+import useClock from "../hooks/useClock";
+import Header from "./Header";
+import Card from "./Card";
+
+function formatData(rows) {
+  if (!rows || rows.length === 0) return [];
+  const headers = rows[0];
+  return rows.slice(1).map((row) =>
+    headers.reduce((obj, key, idx) => {
+      obj[key] = row[idx] ?? "";
+      return obj;
+    }, {})
+  );
+}
+
 export default function Carousel() {
   const [screenIndex, setScreenIndex] = useState(0);
-  const [dateTime, setDateTime] = useState(new Date());
+  const dateTime = useClock(1000);
 
-  const SECTIONS = [
-    {
-      key: "businessNews",
-      title: "📊 Business Updates",
-      url: `${baseUrl}/api/business-news`,
-      theme: "from-[#0E3B43] to-[#415a77]",
-      type: "news",
-    },
-    {
-      key: "corpNews",
-      title: "🏢 Office / Corporate",
-      url: `${baseUrl}/api/corp-news`,
-      theme: "from-[#216869] to-[#6e68a1]",
-      type: "news",
-    },
-    {
-      key: "media",
-      title: "🎥 Media & Events",
-      url: `${baseUrl}/api/event-media`,
-      extraUrl: `${baseUrl}/api/event-details`, // 👈 dynamic extra API
-      theme: "from-[#677DB7] to-[#415a77]",
-      type: "media",
-    },
-    {
-      key: "employees",
-      title: "👥 Employee Highlights",
-      url: `${baseUrl}/api/employees`,
-      theme: "from-[#0E3B43] to-[#216869]",
-      type: "employee",
-    },
-  ];
-
-  const formatData = (rows) => {
-    if (!rows || rows.length === 0) return [];
-    const headers = rows[0];
-    return rows.slice(1).map((row) =>
-      headers.reduce((obj, key, idx) => {
-        obj[key] = row[idx] ?? "";
-        return obj;
-      }, {})
-    );
-  };
-
-  // Fetch all section data dynamically
+  // queries
   const queries = useQueries({
     queries: SECTIONS.map((s) => ({
       queryKey: [s.key],
       queryFn: async () => {
-        // Fetch main section data
-        const res = await fetch(s.url);
-        const data = await res.json();
+        const data = await fetchJson(s.url);
+        let mainData = s.key === "media" ? data : formatData(data);
 
-        // Format main data
-        let mainData;
-        if (s.key === "media") {
-          mainData = data; // media already in proper format
-        } else {
-          mainData = formatData(data); // Convert 2D array to objects
-        }
-
-        // If section has extra URL (like event details)
         if (s.extraUrl) {
-          const extraRes = await fetch(s.extraUrl);
-          const extraData = await extraRes.json();
-
-          // Normalize extra data with formatData and add _type
-          const formattedExtra = formatData(extraData).map((d) => ({
+          const extra = await fetchJson(s.extraUrl);
+          const formattedExtra = formatData(extra).map((d) => ({
             ...d,
             _type: "eventDetail",
           }));
-
           mainData = [...mainData, ...formattedExtra];
         }
-
         return mainData;
       },
       staleTime: 60000,
@@ -89,17 +47,11 @@ export default function Carousel() {
     })),
   });
 
-  // Live clock
-  useEffect(() => {
-    const timer = setInterval(() => setDateTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
   const active = SECTIONS[screenIndex];
   const activeQuery = queries[screenIndex];
   const items = activeQuery?.data || [];
 
-  /** Auto-slide logic using backend durations */
+  // Auto-slide using durations for media
   useEffect(() => {
     let intervalTime = 10000;
     if (active.type === "media" && items.length) {
@@ -113,31 +65,12 @@ export default function Carousel() {
     }, intervalTime);
 
     return () => clearTimeout(timer);
-  }, [screenIndex, active.type, items, SECTIONS.length]);
+  }, [screenIndex, active.type, items]);
 
   return (
     <div className="w-full h-screen overflow-hidden flex flex-col">
-      {/* Header */}
-      <header className="w-full bg-[#1e293b] text-white flex justify-between items-center px-8 py-3 shadow-lg">
-        <div className="flex items-center space-x-2">
-          <h1 className="text-2xl font-bold">Vonnue</h1>
-        </div>
-        <div className="text-right">
-          <div className="text-lg font-bold">
-            {dateTime.toLocaleTimeString("en-US", { hour12: false })}
-          </div>
-          <div className="text-sm opacity-80">
-            {dateTime.toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-          </div>
-        </div>
-      </header>
+      <Header dateTime={dateTime} />
 
-      {/* Carousel */}
       <AnimatePresence mode="wait">
         <motion.div
           key={screenIndex}
@@ -151,130 +84,21 @@ export default function Carousel() {
             {active.title}
           </h1>
 
-          {activeQuery.isLoading ? (
+          {activeQuery?.isLoading ? (
             <p className="text-white text-lg">⏳ Loading...</p>
-          ) : activeQuery.isError ? (
+          ) : activeQuery?.isError ? (
             <p className="text-white text-lg">❌ Error loading data</p>
           ) : items.length === 0 ? (
             <p className="text-white text-lg opacity-80">🚫 No updates</p>
           ) : (
             <div className="flex flex-wrap justify-center gap-6 w-full max-w-7xl overflow-hidden">
               {items.map((item, index) => (
-                <Card
-                  key={item.id || index}
-                  type={item._type || active.type}
-                  item={item}
-                />
+                <Card key={item.id || index} type={item._type || active.type} item={item} />
               ))}
             </div>
           )}
         </motion.div>
       </AnimatePresence>
-    </div>
-  );
-}
-
-/* ------------------- Card ------------------- */
-function Card({ type, item }) {
-  const baseClasses =
-    "bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl text-white flex flex-col flex-1 basis-[22rem] min-w-[18rem] max-w-[24rem]";
-  const [isLoaded, setIsLoaded] = useState(false);
-  if (type === "employee") {
-    return (
-      <div className={`${baseClasses} p-6`}>
-        {item["Employee image url"] && (
-          <img
-            src={`${baseUrl}${item["Employee image url"]}`}
-            alt={item["Employee name"]}
-            className="w-full h-40 object-contain rounded-lg mb-4"
-            loading="lazy"
-          />
-        )}
-        <h2 className="text-xl font-bold mb-2">{item["Employee name"]}</h2>
-        <p className="text-sm opacity-90">{item["Employee detail"]}</p>
-      </div>
-    );
-  }
-
-  if (type === "media") {
-    const isVideo = item.type === "video" || item.url?.endsWith(".mp4");
-    return (
-      <div className={baseClasses}>
-        <div className="relative w-full h-56 rounded-2xl overflow-hidden bg-black/50">
-          {!isLoaded && (
-            <img
-              src={placeholder}
-              alt="loading preview"
-              className="absolute inset-0 w-full h-full object-cover animate-pulse transition-opacity duration-500"
-            />
-          )}
-          {isVideo ? (
-            <video
-              src={`${baseUrl}${item.url}`}
-              autoPlay
-              loop
-              muted
-              playsInline
-              preload="auto"
-              className={`w-full h-full object-cover transition-opacity duration-500 ${
-                isLoaded ? "opacity-100" : "opacity-0"
-              }`}
-              onLoadedData={() => setIsLoaded(true)}
-            />
-          ) : (
-            <img
-              src={`${baseUrl}${item.url}`}
-              alt={item.name}
-              className="w-full h-56 object-cover rounded-t-2xl"
-              loading="lazy"
-              onLoad={() => setIsLoaded(true)}
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (type === "eventDetail") {
-    return (
-      <div className="bg-white/10 backdrop-blur-lg rounded-2xl shadow-xl text-white flex flex-col p-6 min-w-[20rem] max-w-[24rem]">
-        <h2 className="text-2xl font-bold mb-2">{item["Event name"]}</h2>
-
-        {item["Date"] && (
-          <p className="text-sm text-gray-200 mb-1">
-            📅 {new Date(item["Date"]).toLocaleDateString()}
-          </p>
-        )}
-
-        {item["Event description"] && (
-          <p className="text-sm opacity-90 mt-2">{item["Event description"]}</p>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div className={`${baseClasses} p-6`}>
-      <h2 className="text-xl font-bold mb-2">{item.Title}</h2>
-      {item.Subtitle && (
-        <h3 className="text-md mb-2 text-gray-200">{item.Subtitle}</h3>
-      )}
-      {item.Description && (
-        <p className="text-sm opacity-90">{item.Description}</p>
-      )}
-      {item.url && (
-        <img
-          src={item.url}
-          alt={item.Title}
-          className="w-full h-32 object-contain rounded-lg mt-3"
-          loading="lazy"
-        />
-      )}
-      {item.Date && (
-        <span className="text-xs text-gray-200 mt-2">
-          {new Date(item.Date).toLocaleDateString()}
-        </span>
-      )}
     </div>
   );
 }
